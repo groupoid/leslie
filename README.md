@@ -2,11 +2,11 @@ Leslie: TLA+
 ============
 
 Leslie is a formally specified language implemented in OCaml, featuring a statically typed subset
-of TLA+ with primitive types (Int, Bool, String), basic arithmetic (+), comprehensive comparison
-operators (<, =, >, <=, >=), logical connectives (/\, \/, \lnot, =>),
-set operations (\in, \cup, \subseteq, literal sets), function constructs (application and lambda expressions),
-record operations, a nondeterministic choice operator (CHOOSE), a modular action system (next-state assignments,
-stuttering, UNCHANGED, ENABLED, conjunction), and a recursive temporal logic system ([], <>, ~>),
+of TLA+ with primitive types (`Int`, `Bool`, `String`), basic arithmetic `+`, comprehensive comparison
+operators `<`, `=`, `>`, `<=`, `>=`, logical connectives `/\`, `\/`, `\lnot`, `=>`,
+set operations `\in`, `\cup`, `\subseteq`, literal sets), function constructs (application and lambda expressions),
+record operations, a nondeterministic choice operator `CHOOSE`, a modular action system (next-state assignments,
+stuttering, `UNCHANGED`, `ENABLED`, conjunction), and a recursive temporal logic system `[]`, `<>`, `~>`,
 supported by a Hindley-Milner-style type inference mechanism, though it omits TLA+’s full
 arithmetic suite, advanced set operations, quantifiers, fairness conditions, and module-level declarations.
 
