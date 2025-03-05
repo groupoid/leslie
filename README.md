@@ -23,18 +23,48 @@ Syntax
 ------
 
 ```
-type typ =
-  | TInt | TBool | TString | TVar of tvar ref | TFormula
-  | TSet of typ | TFun of typ * typ | TRec of (string * typ) list
-and tvar = Free of int | Link of typ
-
 type expr =
-  | EInt of int | EBool of bool | EString of string | EVar of string
-  | EIn of expr * expr | EUnion of expr * expr | EFun of string * expr * expr
-  | EApp of expr * expr | ERec of (string * expr) list | EField of expr * string
-  | EAnd of expr * expr | EPlus of expr * expr | ESet of expr list
-  | EAlways of expr | EEventually of expr | ELeadsTo of expr * expr
+  | EInt of int
+  | EBool of bool
+  | EString of string
+  | EVar of string
+  | EIn of expr * expr
+  | EUnion of expr * expr
+  | ESubset of expr * expr
+  | EFun of string * expr * expr
+  | EApp of expr * expr
+  | ERec of (string * expr) list
+  | EField of expr * string
+  | EAnd of expr * expr
+  | EOr of expr * expr
+  | ENot of expr
+  | EImply of expr * expr
+  | EPlus of expr * expr
+  | ESet of expr list
+  | ELess of expr * expr
+  | EEq of expr * expr
+  | EGreater of expr * expr
+  | ELessEq of expr * expr
+  | EGreaterEq of expr * expr
+  | EChoose of string * expr * expr
+```
 
+```
+type action =
+  | ANext of string * expr
+  | AUnchanged of string list
+  | AEnabled of action
+  | AConj of action * action
+  | AExpr of expr
+  | AStutter of action * string list
+```
+
+```
+type temporal =
+  | TAlways of temporal
+  | TEventually of temporal
+  | TLeadsTo of temporal * temporal
+  | TAction of action
 ```
 
 Credits
