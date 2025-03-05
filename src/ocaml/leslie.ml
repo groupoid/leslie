@@ -317,4 +317,18 @@ let () =
   test "CHOOSE x \\in {1, 2}: x" infer_expr
     (EChoose ("x", ESet [EInt 1; EInt 2], EVar "x")) ~env:[];
   test "CHOOSE x \\in 1: x > 0" infer_expr
-    (EChoose ("x", EInt 1, EGreater (EVar "x", EInt 0))) ~env:[]
+    (EChoose ("x", EInt 1, EGreater (EVar "x", EInt 0))) ~env:[];
+  test "{1, 2} \\cap {2, 3}" infer_expr (EIntersect (ESet [EInt 1; EInt 2], ESet [EInt 2; EInt 3])) ~env:[];
+  test "{1, 2} \\ {2}" infer_expr (EMinus (ESet [EInt 1; EInt 2], ESet [EInt 2])) ~env:[];
+  test "POWERSET {1, 2}" infer_expr (EPowerset (ESet [EInt 1; EInt 2])) ~env:[];
+  test "{1} \\cap 1" infer_expr (EIntersect (ESet [EInt 1], EInt 1)) ~env:[];
+  test "\\A x \\in {1, 2}: x > 0" infer_expr 
+    (EForall ("x", ESet [EInt 1; EInt 2], EGreater (EVar "x", EInt 0))) ~env:[];
+  test "\\E x \\in {1, 2}: x > 0" infer_expr 
+    (EExists ("x", ESet [EInt 1; EInt 2], EGreater (EVar "x", EInt 0))) ~env:[];
+  test "\\A x \\in {1, 2}: x" infer_expr 
+    (EForall ("x", ESet [EInt 1; EInt 2], EVar "x")) ~env:[];
+  test "WF_x(x' = x + 1)" infer_temporal 
+    (TWeakFair (ANext ("x", EPlus (EVar "x", EInt 1)), ["x"])) ~env;
+  test "SF_{x,y}(y' = x)" infer_temporal 
+    (TStrongFair (ANext ("y", EVar "x"), ["x"; "y"])) ~env
