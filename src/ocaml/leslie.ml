@@ -44,9 +44,24 @@ type expr =
   | EApp of expr * expr | ERec of (string * expr) list | EField of expr * string
   | EAnd of expr * expr | EPlus of expr * expr | ESet of expr list
   | EAlways of expr | EEventually of expr | ELeadsTo of expr * expr
-  | EPrime of string | EAction of expr | ELess of expr * expr | EEq of expr * expr
+  | EPrime of string | EAction of expr * string list | ELess of expr * expr | EEq of expr * expr
 
 type env = (string * typ) list
+
+let rec primed_vars e =
+  match e with
+  | EInt _ | EBool _ | EString _ -> []
+  | EVar _ -> []
+  | EPrime x -> [x]
+  | EIn (e1, e2) | EUnion (e1, e2) | EAnd (e1, e2) | EPlus (e1, e2) 
+  | ELess (e1, e2) | EEq (e1, e2) | ELeadsTo (e1, e2) ->
+      primed_vars e1 @ primed_vars e2
+  | EFun (_, s, e) -> primed_vars s @ primed_vars e
+  | EApp (f, e) -> primed_vars f @ primed_vars e
+  | ERec fields -> List.concat (List.map (fun (_, e) -> primed_vars e) fields)
+  | EField (r, _) -> primed_vars r
+  | ESet es -> List.concat (List.map primed_vars es)
+  | EAlways e | EEventually e | EAction (e, _) -> primed_vars e
 
 let rec infer (env : env) (e : expr) : typ =
   match e with
@@ -109,8 +124,14 @@ let rec infer (env : env) (e : expr) : typ =
       TFormula
   | EPrime x ->
       (try List.assoc x env with Not_found -> raise (TypeError ("Unbound primed: " ^ x)))
-  | EAction e ->
-      unify (infer env e) TBool;
+  | EAction (e, vars) ->
+      let t = infer env e in
+      unify t TBool;
+      let pv = primed_vars e in
+      List.iter (fun x ->
+        if not (List.mem x vars) then
+          raise (TypeError ("Primed variable " ^ x ^ " not in action variables " ^ String.concat ", " vars))
+      ) pv;
       TBool
   | ELess (e1, e2) ->
       unify (infer env e1) TInt;
@@ -140,7 +161,7 @@ let test_expr name e ?(env = []) =
     Printf.printf "Test '%s': Type error - %s\n" name msg
 
 let () =
-  let env = [("x", TInt)] in
+  let env = [("x", TInt); ("y", TInt)] in
   test_expr "1 \\in {1, 2, 3}" (EIn (EInt 1, ESet [EInt 1; EInt 2; EInt 3])) ~env:[];
   test_expr "([x \\in {1, 2} |-> x + 1])[2]" 
     (EApp (EFun ("x", ESet [EInt 1; EInt 2], EPlus (EVar "x", EInt 1)), EInt 2)) ~env:[];
@@ -159,8 +180,10 @@ let () =
     (ELeadsTo (EIn (EInt 1, ESet [EInt 1]), EBool true)) ~env:[];
   test_expr "1 ~> TRUE" (ELeadsTo (EInt 1, EBool true)) ~env:[];
   test_expr "x' = x + 1" (EEq (EPrime "x", EPlus (EVar "x", EInt 1))) ~env;
-  test_expr "[x' = x + 1]" (EAction (EEq (EPrime "x", EPlus (EVar "x", EInt 1)))) ~env;
+  test_expr "[x' = x + 1]_x" (EAction (EEq (EPrime "x", EPlus (EVar "x", EInt 1)), ["x"])) ~env;
   test_expr "x < 2" (ELess (EVar "x", EInt 2)) ~env;
   test_expr "x = x'" (EEq (EVar "x", EPrime "x")) ~env;
   test_expr "x < TRUE" (ELess (EVar "x", EBool true)) ~env;
-  test_expr "[](x < 2)" (EAlways (ELess (EVar "x", EInt 2))) ~env
+  test_expr "[](x < 2)" (EAlways (ELess (EVar "x", EInt 2))) ~env;
+  test_expr "[x' = x + 1]_y" (EAction (EEq (EPrime "x", EPlus (EVar "x", EInt 1)), ["y"])) ~env;
+  test_expr "[y' = x + 1]_{x,y}" (EAction (EEq (EPrime "y", EPlus (EVar "x", EInt 1)), ["x"; "y"])) ~env
