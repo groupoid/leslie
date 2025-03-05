@@ -1,6 +1,8 @@
 Leslie: TLA+
 ============
 
+<img src="https://leslie.groupoid.space/img/Leslie_Lamport.jpg">
+
 Leslie is a formally specified language implemented in OCaml, featuring a statically typed subset
 of TLA+ with primitive types (`Int`, `Bool`, `String`), basic arithmetic `+`, comprehensive comparison
 operators `<`, `=`, `>`, `<=`, `>=`, logical connectives `/\`, `\/`, `\lnot`, `=>`,
