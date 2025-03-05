@@ -114,6 +114,15 @@ Test 'CHOOSE x \in {1, 2}: x > 0': Int
 Test 'CHOOSE x \in {1, 2}: TRUE': Int
 Test 'CHOOSE x \in {1, 2}: x': Type error - Type mismatch
 Test 'CHOOSE x \in 1: x > 0': Type error - Type mismatch
+Test '{1, 2} \cap {2, 3}': Set(Set(Int))
+Test '{1, 2} \ {2}': Set(Set(Int))
+Test 'POWERSET {1, 2}': Set(Set(Int))
+Test '{1} \cap 1': Type error - Type mismatch
+Test '\A x \in {1, 2}: x > 0': Bool
+Test '\E x \in {1, 2}: x > 0': Bool
+Test '\A x \in {1, 2}: x': Type error - Type mismatch
+Test 'WF_x(x' = x + 1)': Formula
+Test 'SF_{x,y}(y' = x)': Formula
 ```
 
 Credits
