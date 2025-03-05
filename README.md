@@ -33,6 +33,9 @@ type expr =
   | EIn of expr * expr
   | EUnion of expr * expr
   | ESubset of expr * expr
+  | EIntersect of expr * expr
+  | EMinus of expr * expr
+  | EPowerset of expr
   | EFun of string * expr * expr
   | EApp of expr * expr
   | ERec of (string * expr) list
@@ -49,6 +52,8 @@ type expr =
   | ELessEq of expr * expr
   | EGreaterEq of expr * expr
   | EChoose of string * expr * expr
+  | EForall of string * expr * expr
+  | EExists of string * expr * expr
 ```
 
 ```

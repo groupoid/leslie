@@ -47,8 +47,8 @@ type expr =
   | EUnion of expr * expr
   | EIntersect of expr * expr
   | EMinus of expr * expr
-  | ESubset of expr * expr
   | EPowerset of expr
+  | ESubset of expr * expr
   | EFun of string * expr * expr
   | EApp of expr * expr
   | ERec of (string * expr) list
