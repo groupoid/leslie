@@ -61,6 +61,7 @@ type expr =
   | EGreater of expr * expr
   | ELessEq of expr * expr
   | EGreaterEq of expr * expr
+  | EChoose of string * expr * expr
 
 type action =
   | ANext of string * expr
@@ -100,6 +101,7 @@ and primed_vars_expr e =
   | EField (r, _) -> primed_vars_expr r
   | ESet es -> List.concat (List.map primed_vars_expr es)
   | ENot e -> primed_vars_expr e
+  | EChoose (_, s, p) -> primed_vars_expr s @ primed_vars_expr p
 
 let rec infer_expr (env : env) (e : expr) : typ =
   match e with
@@ -166,6 +168,13 @@ let rec infer_expr (env : env) (e : expr) : typ =
        | EEq _ -> unify t1 t2
        | _ -> unify t1 TInt; unify t2 TInt);
       TBool
+  | EChoose (x, s, p) ->
+      let ts = infer_expr env s in
+      let a = new_tvar () in
+      unify ts (TSet a);
+      let tp = infer_expr ((x, a) :: env) p in
+      unify tp TBool;
+      a
 
 let rec infer_action (env : env) (a : action) : typ =
   match a with
@@ -270,4 +279,12 @@ let () =
   test "\\lnot 1" infer_expr (ENot (EInt 1)) ~env:[];
   test "TRUE => FALSE" infer_expr (EImply (EBool true, EBool false)) ~env:[];
   test "x => 1" infer_expr (EImply (EVar "x", EInt 1)) ~env;
-  test "ENABLED (x' = x + 1)" infer_action (AEnabled (ANext ("x", EPlus (EVar "x", EInt 1)))) ~env
+  test "ENABLED (x' = x + 1)" infer_action (AEnabled (ANext ("x", EPlus (EVar "x", EInt 1)))) ~env;
+  test "CHOOSE x \\in {1, 2}: x > 0" infer_expr 
+    (EChoose ("x", ESet [EInt 1; EInt 2], EGreater (EVar "x", EInt 0))) ~env:[];
+  test "CHOOSE x \\in {1, 2}: TRUE" infer_expr 
+    (EChoose ("x", ESet [EInt 1; EInt 2], EBool true)) ~env:[];
+  test "CHOOSE x \\in {1, 2}: x" infer_expr 
+    (EChoose ("x", ESet [EInt 1; EInt 2], EVar "x")) ~env:[];
+  test "CHOOSE x \\in 1: x > 0" infer_expr 
+    (EChoose ("x", EInt 1, EGreater (EVar "x", EInt 0))) ~env:[]
