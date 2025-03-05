@@ -37,6 +37,53 @@ type expr =
 
 ```
 
+Tests
+-----
+
+```
+Test '1 \in {1, 2, 3}': Bool
+Test '([x \in {1, 2} |-> x + 1])[2]': Int
+Test '[a |-> 1, b |-> TRUE].b': Bool
+Test 'TRUE /\ (1 \in {1})': Bool
+Test '1 + TRUE': Type error - Type mismatch
+Test '([x \in {1, 2} |-> x + 1])["hello"]': Type error - Type mismatch
+Test '[]TRUE': Formula
+Test '<>(1 \in {1, 2})': Formula
+Test '[]1': Type error - Type mismatch
+Test '<>(x + 1)': Type error - Type mismatch
+Test '(1 \in {1}) ~> TRUE': Formula
+Test '1 ~> TRUE': Type error - Type mismatch
+Test 'x' = x + 1': Bool
+Test '[x' = x + 1]_x': Bool
+Test 'x < 2': Bool
+Test 'x = x'': Bool
+Test 'x < TRUE': Type error - Type mismatch
+Test '[](x < 2)': Formula
+Test '[x' = x + 1]_y': Type error - Primed variable x not in action variables y
+Test '[y' = x + 1]_{x,y}': Bool
+Test 'x > 2': Bool
+Test 'x <= y': Bool
+Test 'x >= 1': Bool
+Test 'x > TRUE': Type error - Type mismatch
+Test 'UNCHANGED <<x>>': Bool
+Test 'UNCHANGED <<x, y>>': Bool
+Test 'UNCHANGED <<z>>': Type error - Unbound variable in UNCHANGED: z
+Test '[UNCHANGED <<x>>]_x': Bool
+Test '{1} \subseteq {1, 2}': Bool
+Test '{1} \subseteq 1': Type error - Type mismatch
+Test 'TRUE \/ FALSE': Bool
+Test '1 \/ 2': Type error - Type mismatch
+Test '\lnot TRUE': Bool
+Test '\lnot 1': Type error - Type mismatch
+Test 'TRUE => FALSE': Bool
+Test 'x => 1': Type error - Type mismatch
+Test 'ENABLED (x' = x + 1)': Bool
+Test 'CHOOSE x \in {1, 2}: x > 0': Int
+Test 'CHOOSE x \in {1, 2}: TRUE': Int
+Test 'CHOOSE x \in {1, 2}: x': Type error - Type mismatch
+Test 'CHOOSE x \in 1: x > 0': Type error - Type mismatch
+```
+
 Credits
 -------
 

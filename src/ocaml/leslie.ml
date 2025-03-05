@@ -45,7 +45,10 @@ type expr =
   | EVar of string
   | EIn of expr * expr
   | EUnion of expr * expr
+  | EIntersect of expr * expr
+  | EMinus of expr * expr
   | ESubset of expr * expr
+  | EPowerset of expr
   | EFun of string * expr * expr
   | EApp of expr * expr
   | ERec of (string * expr) list
@@ -62,6 +65,8 @@ type expr =
   | ELessEq of expr * expr
   | EGreaterEq of expr * expr
   | EChoose of string * expr * expr
+  | EForall of string * expr * expr
+  | EExists of string * expr * expr
 
 type action =
   | ANext of string * expr
@@ -75,6 +80,8 @@ type temporal =
   | TAlways of temporal
   | TEventually of temporal
   | TLeadsTo of temporal * temporal
+  | TWeakFair of action * string list
+  | TStrongFair of action * string list
   | TAction of action
 
 type env = (string * typ) list
@@ -91,8 +98,8 @@ let rec primed_vars_action a =
 and primed_vars_expr e =
   match e with
   | EInt _ | EBool _ | EString _ | EVar _ -> []
-  | EIn (e1, e2) | EUnion (e1, e2) | ESubset (e1, e2) | EAnd (e1, e2) | EOr (e1, e2)
-  | EImply (e1, e2) | EPlus (e1, e2) | ELess (e1, e2) | EEq (e1, e2)
+  | EIn (e1, e2) | EUnion (e1, e2) | EIntersect (e1, e2) | EMinus (e1, e2) | ESubset (e1, e2)
+  | EAnd (e1, e2) | EOr (e1, e2) | EImply (e1, e2) | EPlus (e1, e2) | ELess (e1, e2) | EEq (e1, e2)
   | EGreater (e1, e2) | ELessEq (e1, e2) | EGreaterEq (e1, e2) ->
       primed_vars_expr e1 @ primed_vars_expr e2
   | EFun (_, s, e) -> primed_vars_expr s @ primed_vars_expr e
@@ -100,8 +107,16 @@ and primed_vars_expr e =
   | ERec fields -> List.concat (List.map (fun (_, e) -> primed_vars_expr e) fields)
   | EField (r, _) -> primed_vars_expr r
   | ESet es -> List.concat (List.map primed_vars_expr es)
-  | ENot e -> primed_vars_expr e
-  | EChoose (_, s, p) -> primed_vars_expr s @ primed_vars_expr p
+  | ENot e | EPowerset e -> primed_vars_expr e
+  | EChoose (_, s, p) | EForall (_, s, p) | EExists (_, s, p) ->
+      primed_vars_expr s @ primed_vars_expr p
+
+let rec primed_vars_temporal t =
+  match t with
+  | TAlways t | TEventually t -> primed_vars_temporal t
+  | TLeadsTo (t1, t2) -> primed_vars_temporal t1 @ primed_vars_temporal t2
+  | TWeakFair (a, _) | TStrongFair (a, _) -> primed_vars_action a
+  | TAction a -> primed_vars_action a
 
 let rec infer_expr (env : env) (e : expr) : typ =
   match e with
@@ -115,7 +130,7 @@ let rec infer_expr (env : env) (e : expr) : typ =
       let a = new_tvar () in
       unify t2 (TSet a); unify t1 a;
       TBool
-  | EUnion (e1, e2) ->
+  | EUnion (e1, e2) | EIntersect (e1, e2) | EMinus (e1, e2) ->
       let t1 = infer_expr env e1 in
       let t2 = infer_expr env e2 in
       unify t1 t2;
@@ -126,6 +141,11 @@ let rec infer_expr (env : env) (e : expr) : typ =
       let a = new_tvar () in
       unify t1 (TSet a); unify t2 (TSet a);
       TBool
+  | EPowerset e ->
+      let t = infer_expr env e in
+      let a = new_tvar () in
+      unify t (TSet a);
+      TSet (TSet a)
   | EFun (x, s, e) ->
       let ts = infer_expr env s in
       let a = new_tvar () in
@@ -175,6 +195,13 @@ let rec infer_expr (env : env) (e : expr) : typ =
       let tp = infer_expr ((x, a) :: env) p in
       unify tp TBool;
       a
+  | EForall (x, s, p) | EExists (x, s, p) ->
+      let ts = infer_expr env s in
+      let a = new_tvar () in
+      unify ts (TSet a);
+      let tp = infer_expr ((x, a) :: env) p in
+      unify tp TBool;
+      TBool
 
 let rec infer_action (env : env) (a : action) : typ =
   match a with
@@ -215,6 +242,9 @@ let rec infer_temporal (env : env) (t : temporal) : typ =
       unify (infer_temporal env t1) TBool;
       unify (infer_temporal env t2) TBool;
       TFormula
+  | TWeakFair (a, _) | TStrongFair (a, _) ->
+      unify (infer_action env a) TBool;
+      TFormula
   | TAction a -> infer_action env a
 
 let rec string_of_typ = function
@@ -237,23 +267,23 @@ let test name infer_fn e ?(env = []) =
 let () =
   let env = [("x", TInt); ("y", TInt)] in
   test "1 \\in {1, 2, 3}" infer_expr (EIn (EInt 1, ESet [EInt 1; EInt 2; EInt 3])) ~env:[];
-  test "([x \\in {1, 2} |-> x + 1])[2]" infer_expr 
+  test "([x \\in {1, 2} |-> x + 1])[2]" infer_expr
     (EApp (EFun ("x", ESet [EInt 1; EInt 2], EPlus (EVar "x", EInt 1)), EInt 2)) ~env:[];
-  test "[a |-> 1, b |-> TRUE].b" infer_expr 
+  test "[a |-> 1, b |-> TRUE].b" infer_expr
     (EField (ERec [("a", EInt 1); ("b", EBool true)], "b")) ~env:[];
-  test "TRUE /\\ (1 \\in {1})" infer_expr 
+  test "TRUE /\\ (1 \\in {1})" infer_expr
     (EAnd (EBool true, EIn (EInt 1, ESet [EInt 1]))) ~env:[];
   test "1 + TRUE" infer_expr (EPlus (EInt 1, EBool true)) ~env:[];
-  test "([x \\in {1, 2} |-> x + 1])[\"hello\"]" infer_expr 
+  test "([x \\in {1, 2} |-> x + 1])[\"hello\"]" infer_expr
     (EApp (EFun ("x", ESet [EInt 1; EInt 2], EPlus (EVar "x", EInt 1)), EString "hello")) ~env:[];
   test "[]TRUE" infer_temporal (TAlways (TAction (AExpr (EBool true)))) ~env:[];
-  test "<>(1 \\in {1, 2})" infer_temporal 
+  test "<>(1 \\in {1, 2})" infer_temporal
     (TEventually (TAction (AExpr (EIn (EInt 1, ESet [EInt 1; EInt 2]))))) ~env:[];
   test "[]1" infer_temporal (TAlways (TAction (AExpr (EInt 1)))) ~env:[];
   test "<>(x + 1)" infer_temporal (TEventually (TAction (AExpr (EPlus (EVar "x", EInt 1))))) ~env;
-  test "(1 \\in {1}) ~> TRUE" infer_temporal 
+  test "(1 \\in {1}) ~> TRUE" infer_temporal
     (TLeadsTo (TAction (AExpr (EIn (EInt 1, ESet [EInt 1]))), TAction (AExpr (EBool true)))) ~env:[];
-  test "1 ~> TRUE" infer_temporal 
+  test "1 ~> TRUE" infer_temporal
     (TLeadsTo (TAction (AExpr (EInt 1)), TAction (AExpr (EBool true)))) ~env:[];
   test "x' = x + 1" infer_action (ANext ("x", EPlus (EVar "x", EInt 1))) ~env;
   test "[x' = x + 1]_x" infer_action (AStutter (ANext ("x", EPlus (EVar "x", EInt 1)), ["x"])) ~env;
@@ -280,11 +310,11 @@ let () =
   test "TRUE => FALSE" infer_expr (EImply (EBool true, EBool false)) ~env:[];
   test "x => 1" infer_expr (EImply (EVar "x", EInt 1)) ~env;
   test "ENABLED (x' = x + 1)" infer_action (AEnabled (ANext ("x", EPlus (EVar "x", EInt 1)))) ~env;
-  test "CHOOSE x \\in {1, 2}: x > 0" infer_expr 
+  test "CHOOSE x \\in {1, 2}: x > 0" infer_expr
     (EChoose ("x", ESet [EInt 1; EInt 2], EGreater (EVar "x", EInt 0))) ~env:[];
-  test "CHOOSE x \\in {1, 2}: TRUE" infer_expr 
+  test "CHOOSE x \\in {1, 2}: TRUE" infer_expr
     (EChoose ("x", ESet [EInt 1; EInt 2], EBool true)) ~env:[];
-  test "CHOOSE x \\in {1, 2}: x" infer_expr 
+  test "CHOOSE x \\in {1, 2}: x" infer_expr
     (EChoose ("x", ESet [EInt 1; EInt 2], EVar "x")) ~env:[];
-  test "CHOOSE x \\in 1: x > 0" infer_expr 
+  test "CHOOSE x \\in 1: x > 0" infer_expr
     (EChoose ("x", EInt 1, EGreater (EVar "x", EInt 0))) ~env:[]
