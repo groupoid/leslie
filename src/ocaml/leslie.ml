@@ -47,6 +47,10 @@ type expr =
   | EPrime of string | EAction of expr * string list | ELess of expr * expr | EEq of expr * expr
   | EGreater of expr * expr | ELessEq of expr * expr | EGreaterEq of expr * expr
   | EUnchanged of string list
+  | ESubset of expr * expr
+  | EOr of expr * expr
+  | ENot of expr
+  | EImply of expr * expr
 
 type env = (string * typ) list
 
@@ -57,14 +61,15 @@ let rec primed_vars e =
   | EPrime x -> [x]
   | EIn (e1, e2) | EUnion (e1, e2) | EAnd (e1, e2) | EPlus (e1, e2) 
   | ELess (e1, e2) | EEq (e1, e2) | ELeadsTo (e1, e2) 
-  | EGreater (e1, e2) | ELessEq (e1, e2) | EGreaterEq (e1, e2) ->
+  | EGreater (e1, e2) | ELessEq (e1, e2) | EGreaterEq (e1, e2)
+  | ESubset (e1, e2) | EOr (e1, e2) | EImply (e1, e2) ->
       primed_vars e1 @ primed_vars e2
   | EFun (_, s, e) -> primed_vars s @ primed_vars e
   | EApp (f, e) -> primed_vars f @ primed_vars e
   | ERec fields -> List.concat (List.map (fun (_, e) -> primed_vars e) fields)
   | EField (r, _) -> primed_vars r
   | ESet es -> List.concat (List.map primed_vars es)
-  | EAlways e | EEventually e | EAction (e, _) -> primed_vars e
+  | EAlways e | EEventually e | ENot e | EAction (e, _) -> primed_vars e
   | EUnchanged _ -> []
 
 let rec infer (env : env) (e : expr) : typ =
@@ -164,6 +169,23 @@ let rec infer (env : env) (e : expr) : typ =
           raise (TypeError ("Unbound variable in UNCHANGED: " ^ x))
       ) vars;
       TBool
+  | ESubset (e1, e2) ->
+      let t1 = infer env e1 in
+      let t2 = infer env e2 in
+      let a = new_tvar () in
+      unify t1 (TSet a); unify t2 (TSet a);
+      TBool
+  | EOr (e1, e2) ->
+      unify (infer env e1) TBool;
+      unify (infer env e2) TBool;
+      TBool
+  | ENot e ->
+      unify (infer env e) TBool;
+      TBool
+  | EImply (e1, e2) ->
+      unify (infer env e1) TBool;
+      unify (infer env e2) TBool;
+      TBool
 
 let rec string_of_typ = function
   | TInt -> "Int"
@@ -216,4 +238,12 @@ let () =
   test_expr "UNCHANGED <<x>>" (EUnchanged ["x"]) ~env;
   test_expr "UNCHANGED <<x, y>>" (EUnchanged ["x"; "y"]) ~env;
   test_expr "UNCHANGED <<z>>" (EUnchanged ["z"]) ~env:[];
-  test_expr "[UNCHANGED <<x>>]_x" (EAction (EUnchanged ["x"], ["x"])) ~env
+  test_expr "[UNCHANGED <<x>>]_x" (EAction (EUnchanged ["x"], ["x"])) ~env;
+  test_expr "{1} \\subseteq {1, 2}" (ESubset (ESet [EInt 1], ESet [EInt 1; EInt 2])) ~env:[];
+  test_expr "{1} \\subseteq 1" (ESubset (ESet [EInt 1], EInt 1)) ~env:[];
+  test_expr "TRUE \\/ FALSE" (EOr (EBool true, EBool false)) ~env:[];
+  test_expr "1 \\/ 2" (EOr (EInt 1, EInt 2)) ~env:[];
+  test_expr "\\lnot TRUE" (ENot (EBool true)) ~env:[];
+  test_expr "\\lnot 1" (ENot (EInt 1)) ~env:[];
+  test_expr "TRUE => FALSE" (EImply (EBool true, EBool false)) ~env:[];
+  test_expr "x => 1" (EImply (EVar "x", EInt 1)) ~env
