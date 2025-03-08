@@ -130,7 +130,7 @@ Test 'WF_x(x' = x + 1)': Formula
 Test 'SF_{x,y}(y' = x)': Formula
 ```
 
-Credits
--------
+Author
+------
 
 * Namdak Tonpa
